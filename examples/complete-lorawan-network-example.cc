@@ -4,6 +4,8 @@
  * network.
  */
 
+#include "ns3/building-allocator.h"
+#include "ns3/buildings-helper.h"
 #include "ns3/end-device-lora-phy.h"
 #include "ns3/gateway-lora-phy.h"
 #include "ns3/end-device-lora-mac.h"
@@ -16,16 +18,17 @@
 #include "ns3/node-container.h"
 #include "ns3/mobility-helper.h"
 #include "ns3/position-allocator.h"
+#include "ns3/hex-grid-position-allocator.h"
 #include "ns3/double.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/periodic-sender-helper.h"
 #include "ns3/command-line.h"
 #include "ns3/network-server-helper.h"
+#include "ns3/forwarder-helper.h"
+#include "ns3/network-status.h"
+#include "ns3/end-device-status.h"
 #include "ns3/correlated-shadowing-propagation-loss-model.h"
 #include "ns3/building-penetration-loss.h"
-#include "ns3/building-allocator.h"
-#include "ns3/buildings-helper.h"
-#include "ns3/forwarder-helper.h"
 #include <algorithm>
 #include <ctime>
 
@@ -35,56 +38,84 @@ NS_LOG_COMPONENT_DEFINE ("ComplexLorawanNetworkExample");
 
 // Network settings
 int nDevices = 200;
-int gatewayRings = 1;
-int nGateways = 3 * gatewayRings * gatewayRings - 3 * gatewayRings + 1;
-double radius = 7500;
-double gatewayRadius = 7500 / ((gatewayRings - 1) * 2 + 1);
+int gatewayRings = 3;
+int nGateways = 3 * gatewayRings * gatewayRings - 3 * gatewayRings + 1; //numero di gateway disposti esagonalmente a anelli
+double radius = 15000; //raggio dell'area se aumento posso avere undersensitivity
 double simulationTime = 600;
-
-// Channel model
-bool shadowingEnabled = false;
-bool buildingsEnabled = false;
-
 int appPeriodSeconds = 600;
-int periodsToSimulate = 1;
-int transientPeriods = 0;
 std::vector<int> sfQuantity (6);
 
 // Output control
-bool print = true;
+bool printEDs = true;
+bool buildingsEnabled = false;
+
+void
+PrintEndDevices (NodeContainer endDevices, NodeContainer gateways, std::string edFilename, std::string gwFilename)
+{
+  const char * c = edFilename.c_str ();
+  std::ofstream edFile;
+  edFile.open (c);
+  for (NodeContainer::Iterator j = endDevices.Begin (); j != endDevices.End (); ++j)
+    {
+      Ptr<Node> object = *j;
+      Ptr<MobilityModel> position = object->GetObject<MobilityModel> ();
+      NS_ASSERT (position != 0);
+      Ptr<NetDevice> netDevice = object->GetDevice (0);
+      Ptr<LoraNetDevice> loraNetDevice = netDevice->GetObject<LoraNetDevice> ();
+      NS_ASSERT (loraNetDevice != 0);
+      Ptr<EndDeviceLoraMac> mac = loraNetDevice->GetMac ()->GetObject<EndDeviceLoraMac> ();
+      int sf = int(mac->GetDataRate ());
+      Vector pos = position->GetPosition ();
+      edFile << pos.x << " " << pos.y << " " << sf << std::endl;
+    }
+  edFile.close ();
+  // Also print the gateways
+  c = gwFilename.c_str ();
+  std::ofstream gwFile;
+  gwFile.open (c);
+  for (NodeContainer::Iterator j = gateways.Begin (); j != gateways.End (); ++j)
+    {
+      Ptr<Node> object = *j;
+      Ptr<MobilityModel> position = object->GetObject<MobilityModel> ();
+      Vector pos = position->GetPosition ();
+      gwFile << pos.x << " " << pos.y << " GW" << std::endl;
+    }
+  gwFile.close ();
+}
+// stampa file di una colonna di SF visti dal network server
+void
+PrintSF (std::map<LoraDeviceAddress, Ptr<EndDeviceStatus>> endDeviceStatuses, std::string SFFilename)
+{
+  const char * c = SFFilename.c_str ();
+  std::ofstream SFFile;
+  SFFile.open (c);
+  for (std::map<LoraDeviceAddress, Ptr<EndDeviceStatus>>::iterator i = endDeviceStatuses.begin (); i != endDeviceStatuses.end (); i++)
+    {
+      Ptr<EndDeviceStatus> EDStatus = (*i).second;
+      ns3::EndDeviceStatus::ReceivedPacketList pktList = (*EDStatus).GetReceivedPacketList();
+      for (ns3::EndDeviceStatus::ReceivedPacketList::iterator j = pktList.begin (); j != pktList.end (); j++)
+        {
+          ns3::EndDeviceStatus::ReceivedPacketInfo info = (*j).second;
+          SFFile << (unsigned)info.sf << std::endl;
+        }
+    }
+  SFFile.close ();
+}
 
 int main (int argc, char *argv[])
 {
 
   CommandLine cmd;
-  cmd.AddValue ("nDevices",
-                "Number of end devices to include in the simulation",
-                nDevices);
-  cmd.AddValue ("gatewayRings",
-                "Number of gateway rings to include",
-                gatewayRings);
-  cmd.AddValue ("radius",
-                "The radius of the area to simulate",
-                radius);
-  cmd.AddValue ("gatewayRadius",
-                "The distance between two gateways",
-                gatewayRadius);
-  cmd.AddValue ("simulationTime",
-                "The time for which to simulate",
-                simulationTime);
-  cmd.AddValue ("shadowingEnabled",
-                "Whether to enable shadowing in the channel",
-                shadowingEnabled);
-  cmd.AddValue ("buildingsEnabled",
-                "Whether to enable buildings",
-                buildingsEnabled);
-  cmd.AddValue ("appPeriod",
-                "The period in seconds to be used by periodically transmitting applications",
-                appPeriodSeconds);
-  cmd.AddValue ("print",
-                "Whether or not to print various informations",
-                print);
+  cmd.AddValue ("nDevices", "Number of end devices to include in the simulation", nDevices);
+  cmd.AddValue ("gatewayRings", "Number of gateway rings to include", gatewayRings);
+  cmd.AddValue ("radius", "The radius of the area to simulate", radius);
+  cmd.AddValue ("simulationTime", "The time for which to simulate", simulationTime);
+  cmd.AddValue ("appPeriod", "The period in seconds to be used by periodically transmitting applications", appPeriodSeconds);
+  cmd.AddValue ("printEDs", "Whether or not to print a file containing the ED's positions", printEDs);
+
   cmd.Parse (argc, argv);
+
+  double gatewayRadius = radius / ((gatewayRings - 1) * 2 + 1);
 
   // Set up logging
   LogComponentEnable ("ComplexLorawanNetworkExample", LOG_LEVEL_ALL);
@@ -105,10 +136,6 @@ int main (int argc, char *argv[])
   // LogComponentEnable("PeriodicSender", LOG_LEVEL_ALL);
   // LogComponentEnable("LoraMacHeader", LOG_LEVEL_ALL);
   // LogComponentEnable("LoraFrameHeader", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkScheduler", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkServer", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkStatus", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkController", LOG_LEVEL_ALL);
 
   /***********
    *  Setup  *
@@ -135,29 +162,30 @@ int main (int argc, char *argv[])
   // Create the lora channel object
   Ptr<LogDistancePropagationLossModel> loss = CreateObject<LogDistancePropagationLossModel> ();
   loss->SetPathLossExponent (3.76);
-  loss->SetReference (1, 8.1);
+  loss->SetReference (1, 7.7);
 
-  if(shadowingEnabled)
+  if (buildingsEnabled)
     {
-      // Create the correlated shadowing component
+      //Create the correlated shadowing component
       Ptr<CorrelatedShadowingPropagationLossModel> shadowing = CreateObject<CorrelatedShadowingPropagationLossModel> ();
 
-      // Aggregate shadowing to the logdistance loss
+      //Aggregate shadowing to the logdistance loss
       loss->SetNext(shadowing);
 
-      // Add the effect to the channel propagation loss
+      //Add the effect to the channel propagation loss
       Ptr<BuildingPenetrationLoss> buildingLoss = CreateObject<BuildingPenetrationLoss> ();
 
       shadowing->SetNext(buildingLoss);
     }
+
 
   Ptr<PropagationDelayModel> delay = CreateObject<ConstantSpeedPropagationDelayModel> ();
 
   Ptr<LoraChannel> channel = CreateObject<LoraChannel> (loss, delay);
 
   /************************
-  *  Create the helpers  *
-  ************************/
+   *  Create the helpers  *
+   ************************/
 
   // Create the LoraPhyHelper
   LoraPhyHelper phyHelper = LoraPhyHelper ();
@@ -168,20 +196,12 @@ int main (int argc, char *argv[])
 
   // Create the LoraHelper
   LoraHelper helper = LoraHelper ();
-  helper.EnablePacketTracking ("performance"); // Output filename
-  // helper.EnableSimulationTimePrinting ();
-
-  //Create the NetworkServerHelper
-  NetworkServerHelper nsHelper = NetworkServerHelper ();
-
-  //Create the ForwarderHelper
-  ForwarderHelper forHelper = ForwarderHelper ();
 
   /************************
-  *  Create End Devices  *
-  ************************/
+   *  Create End Devices  *
+   ************************/
 
-  // Create a set of nodes
+  // Create a set of nodes, creo nDevices endDevices
   NodeContainer endDevices;
   endDevices.Create (nDevices);
 
@@ -191,7 +211,7 @@ int main (int argc, char *argv[])
   // Make it so that nodes are at a certain height > 0
   for (NodeContainer::Iterator j = endDevices.Begin ();
        j != endDevices.End (); ++j)
-    {
+        {
       Ptr<MobilityModel> mobility = (*j)->GetObject<MobilityModel> ();
       Vector position = mobility->GetPosition ();
       position.z = 1.2;
@@ -221,8 +241,8 @@ int main (int argc, char *argv[])
     }
 
   /*********************
-  *  Create Gateways  *
-  *********************/
+   *  Create Gateways  *
+   *********************/
 
   // Create the gateway nodes (allocate them uniformely on the disc)
   NodeContainer gateways;
@@ -231,9 +251,22 @@ int main (int argc, char *argv[])
   Ptr<ListPositionAllocator> allocator = CreateObject<ListPositionAllocator> ();
   // Make it so that nodes are at a certain height > 0
   allocator->Add (Vector (0.0, 0.0, 15.0));
-  mobility.SetPositionAllocator (allocator);
+
+  //create hex-grid
+  Ptr<HexGridPositionAllocator> grid = CreateObject<HexGridPositionAllocator> (gatewayRadius);
+  mobility.SetPositionAllocator (grid);
+
   mobility.Install (gateways);
 
+  // Make it so that nodes are at a certain height > 0
+  for (NodeContainer::Iterator j = gateways.Begin ();
+       j != gateways.End (); ++j)
+    {
+      Ptr<MobilityModel> mobility = (*j)->GetObject<MobilityModel> ();
+      Vector position = mobility->GetPosition ();
+      position.z = 15;
+      mobility->SetPosition (position);
+    }
 
   // Create a netdevice for each gateway
   phyHelper.SetDeviceType (LoraPhyHelper::GW);
@@ -275,26 +308,49 @@ int main (int argc, char *argv[])
   BuildingsHelper::MakeMobilityModelConsistent ();
 
   // Print the buildings
-  if (print)
+  std::ofstream myfile;
+  myfile.open ("buildings.txt");
+  std::vector<Ptr<Building> >::const_iterator it;
+  int j = 1;
+  for (it = bContainer.Begin (); it != bContainer.End (); ++it, ++j)
     {
-      std::ofstream myfile;
-      myfile.open ("buildings.txt");
-      std::vector<Ptr<Building> >::const_iterator it;
-      int j = 1;
-      for (it = bContainer.Begin (); it != bContainer.End (); ++it, ++j)
-        {
-          Box boundaries = (*it)->GetBoundaries ();
-          myfile << "set object " << j << " rect from " << boundaries.xMin << "," << boundaries.yMin << " to " << boundaries.xMax << "," << boundaries.yMax << std::endl;
-        }
-      myfile.close();
-
+      Box boundaries = (*it)->GetBoundaries ();
+      myfile << "set object " << j << " rect from " << boundaries.xMin << "," << boundaries.yMin << " to " << boundaries.xMax << "," << boundaries.yMax << std::endl;
     }
+  myfile.close();
+
+
+
 
   /**********************************************
    *  Set up the end device's spreading factor  *
    **********************************************/
 
   sfQuantity = macHelper.SetSpreadingFactorsUp (endDevices, gateways, channel);
+
+  ////////////
+  // Create NS
+  ////////////
+
+  NodeContainer networkServers;
+  networkServers.Create (1);
+
+  // Install the SimpleNetworkServer application on the network server
+
+  NetworkServerHelper networkServerHelper;
+  networkServerHelper.SetGateways (gateways);
+  networkServerHelper.SetEndDevices (endDevices);
+  ApplicationContainer nsAppContainer = networkServerHelper.Install (networkServers);
+
+
+
+  Ptr<NetworkServer> ns = nsAppContainer.Get(0)->GetObject<NetworkServer> ();
+  Ptr<NetworkStatus> status = ns->GetNetworkStatus ();
+
+  // Install the Forwarder application on the gateways
+
+  ForwarderHelper forwarderHelper;
+  forwarderHelper.Install (gateways);
 
   NS_LOG_DEBUG ("Completed configuration");
 
@@ -312,47 +368,65 @@ int main (int argc, char *argv[])
   appContainer.Start (Seconds (0));
   appContainer.Stop (appStopTime);
 
-  /**************************
-   *  Create Network Server  *
-   ***************************/
-
-  // Create the NS node
-  NodeContainer networkServer;
-  networkServer.Create (1);
-
-  // Create a NS for the network
-  nsHelper.SetEndDevices (endDevices);
-  nsHelper.SetGateways (gateways);
-  nsHelper.Install (networkServer);
-
-  //Create a forwarder for each gateway
-  forHelper.Install(gateways);
-
   /**********************
    * Print output files *
    *********************/
-  if (print)
+
+  if (printEDs)
     {
-      helper.PrintEndDevices (endDevices, gateways,
-                              "src/lorawan/examples/endDevices.dat");
+      PrintEndDevices (endDevices, gateways,
+                       "nodeLocations.dat", "gwLocations.dat");
     }
 
-  ////////////////
-  // Simulation //
-  ////////////////
+  /****************
+   *  Simulation  *
+   ****************/
 
-  Simulator::Stop (appStopTime + Hours (1000));
+  Simulator::Stop (appStopTime + Hours (2));
 
-  NS_LOG_INFO ("Running simulation...");
+  // PrintSimulationTime ();
+
   Simulator::Run ();
 
   Simulator::Destroy ();
 
-  ///////////////////////////
-  // Print results to file //
-  ///////////////////////////
-  NS_LOG_INFO ("Computing performance metrics...");
-  helper.PrintPerformance(transientPeriods * appPeriod, appStopTime);
 
+  std::map<LoraDeviceAddress, Ptr<EndDeviceStatus> > endDeviceStatuses = status->m_endDeviceStatuses;
+  //std::map<Address, Ptr<GatewayStatus>> gatewayStatuses= status->m_gatewayStatuses;
+  PrintSF(endDeviceStatuses, "printSF.dat");
+  double received = 0;
+  std::string PowFilename = "potenze.dat";
+  std::string NumGwPerPktFilename = "gwperpkt.dat";
+  const char * c = PowFilename.c_str ();
+  const char * d = NumGwPerPktFilename.c_str ();
+  std::ofstream PowFile;
+  std::ofstream NumGwPerPktFile;
+  PowFile.open (c);
+  NumGwPerPktFile.open (d);
+  for (std::map<LoraDeviceAddress, Ptr<EndDeviceStatus>>::iterator i = endDeviceStatuses.begin (); i != endDeviceStatuses.end (); i++)
+    {
+      Ptr<EndDeviceStatus> EDStatus = (*i).second;
+      ns3::EndDeviceStatus::ReceivedPacketList pktList = (*EDStatus).GetReceivedPacketList();
+
+      received += (double)pktList.size();
+
+      for (ns3::EndDeviceStatus::ReceivedPacketList::iterator j = pktList.begin (); j != pktList.end (); j++)
+        {
+          ns3::EndDeviceStatus::ReceivedPacketInfo info = (*j).second;
+          ns3::EndDeviceStatus::GatewayList gatewayList = info.gwList;
+          Ptr<Packet const> pkt=(*j).first;
+          NumGwPerPktFile << pkt <<" "<<gatewayList.size()<< std::endl;
+          for (ns3::EndDeviceStatus::GatewayList::iterator k = gatewayList.begin (); k != gatewayList.end (); k++)
+            {
+              ns3::EndDeviceStatus::PacketInfoPerGw infoPerGw = (*k).second;
+              PowFile << infoPerGw.gwAddress<<" "<<infoPerGw.rxPower << std::endl;
+            }
+        }
+    }
+  PowFile.close();
+  NumGwPerPktFile.close();
+  std::cout<<received<<"\n";
+  double receivedProb = received/nDevices;
+  std::cout<<receivedProb<<"\n";
   return 0;
 }

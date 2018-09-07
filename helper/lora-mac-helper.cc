@@ -252,9 +252,25 @@ LoraMacHelper::SetSpreadingFactorsUp (NodeContainer endDevices, NodeContainer ga
       NS_ASSERT (loraNetDevice != 0);
       Ptr<EndDeviceLoraMac> mac = loraNetDevice->GetMac ()->GetObject<EndDeviceLoraMac> ();
       NS_ASSERT (mac != 0);
-
+        Vector EDpos = position->GetPosition ();
       // Try computing the distance from each gateway and find the best one
-      Ptr<Node> bestGateway = gateways.Get (0);
+
+        Ptr<Node> bestGateway = gateways.Get (0);
+        double mindistance = std::numeric_limits<double>::infinity();
+        double distance;
+        for (NodeContainer::Iterator i = gateways.Begin (); i != gateways.End (); ++i)
+            {
+                Ptr<Node> thisGW = *i;
+                Ptr<MobilityModel> GWposition = thisGW->GetObject<MobilityModel> ();
+                Vector GWpos = GWposition->GetPosition ();
+                distance=sqrt(pow(EDpos.x-GWpos.x,2)+pow(EDpos.y-GWpos.y,2));
+                if (mindistance>distance)
+                {
+                    mindistance=distance;
+                    bestGateway=thisGW;
+                }
+            }
+
       Ptr<MobilityModel> bestGatewayPosition = bestGateway->GetObject<MobilityModel> ();
 
       // Assume devices transmit at 14 dBm
@@ -277,6 +293,7 @@ LoraMacHelper::SetSpreadingFactorsUp (NodeContainer endDevices, NodeContainer ga
         }
 
       // NS_LOG_DEBUG ("Rx Power: " << highestRxPower);
+
       double rxPower = highestRxPower;
 
       // Get the ED sensitivity
@@ -323,7 +340,7 @@ LoraMacHelper::SetSpreadingFactorsUp (NodeContainer endDevices, NodeContainer ga
 
         }
 
-/*
+
 
       // Get the Gw sensitivity
       Ptr<NetDevice> gatewayNetDevice = bestGateway->GetDevice (0);
@@ -371,7 +388,7 @@ LoraMacHelper::SetSpreadingFactorsUp (NodeContainer endDevices, NodeContainer ga
           sfQuantity[6] = sfQuantity[6] + 1;
 
         }
-        */
+
 
     } // end loop on nodes
 

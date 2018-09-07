@@ -31,277 +31,277 @@
 
 namespace ns3 {
 
+  /**
+   * Class representing the MAC layer of a LoRaWAN device.
+   */
+  class EndDeviceLoraMac : public LoraMac
+  {
+  public:
+    static TypeId GetTypeId (void);
+
+    EndDeviceLoraMac ();
+    virtual ~EndDeviceLoraMac ();
+
+    /////////////////////
+    // Sending methods //
+    /////////////////////
+
+    /**
+     * Send a packet.
+     *
+     * The MAC layer of the ED will take care of using the right parameters.
+     *
+     * \param packet the packet to send
+     */
+    virtual void Send (Ptr<Packet> packet);
+
+    /**
+     * Checking if we are performing the transmission of a new packet or a retransmission, and call SendToPhy function.
+     *
+     * \param packet the packet to send
+     */
+    virtual void DoSend (Ptr<Packet> packet);
+
+    /**
+     * Add headers and send a packet with the sending function of the physical layer.
+     *
+     * \param packet the packet to send
+     */
+    virtual void SendToPhy (Ptr<Packet> packet);
+
+    /**
+     * Postpone transmission to the specified time and delete previously scheduled transmissions if present.
+     *
+     * \param nextTxDelay Delay at which the transmission will be performed.
+     */
+    virtual void postponeTransmission (Time nextTxDelay, Ptr<Packet>);
+
+
+    ///////////////////////
+    // Receiving methods //
+    ///////////////////////
+
+    /**
+     * Receive a packet.
+     *
+     * This method is typically registered as a callback in the underlying PHY
+     * layer so that it's called when a packet is going up the stack.
+     *
+     * \param packet the received packet.
+     */
+    virtual void Receive (Ptr<Packet const> packet);
+
+    virtual void FailedReception (Ptr<Packet const> packet);
+
+    /**
+     * Perform the actions that are required after a packet send.
+     *
+     * This function handles opening of the first receive window.
+     */
+    void TxFinished (Ptr<const Packet> packet);
+
+    /**
+     * Perform operations needed to open the first receive window.
+     */
+    void OpenFirstReceiveWindow (void);
+
+    /**
+     * Perform operations needed to open the second receive window.
+     */
+    void OpenSecondReceiveWindow (void);
+
+    /**
+     * Perform operations needed to close the first receive window.
+     */
+    void CloseFirstReceiveWindow (void);
+
+    /**
+     * Perform operations needed to close the second receive window.
+     */
+    void CloseSecondReceiveWindow (void);
+
+    /////////////////////////
+    // Getters and Setters //
+    /////////////////////////
+
+    /**
+     * Reset retransmission parameters contained in the structure LoraRetxParams
+     */
+    virtual void resetRetransmissionParameters ();
+
+    /**
+     * Enable data rate adaptation in the retransmitting procedure.
+     *
+     * \param adapt If the data rate adaptation is enabled or not.
+     */
+    void SetDataRateAdaptation (bool adapt);
+
+    /**
+     * Get if data rate adaptation is enabled or not.
+     */
+    bool GetDataRateAdaptation (void);
+
+    /**
+     * Set the maximum number of transmissions allowed.
+     *
+     * \param maxNumbTx The maximum number of transmissions allowed
+     */
+    void SetMaxNumberOfTransmissions (uint8_t maxNumbTx);
+
+    /**
+     * Set the maximum number of transmissions allowed.
+     */
+    uint8_t GetMaxNumberOfTransmissions (void);
+
 /**
-  * Class representing the MAC layer of a LoRaWAN device.
-  */
-class EndDeviceLoraMac : public LoraMac
-{
-public:
-  static TypeId GetTypeId (void);
-
-  EndDeviceLoraMac ();
-  virtual ~EndDeviceLoraMac ();
-
-  /////////////////////
-  // Sending methods //
-  /////////////////////
-
-  /**
-   * Send a packet.
-   *
-   * The MAC layer of the ED will take care of using the right parameters.
-   *
-   * \param packet the packet to send
-   */
-  virtual void Send (Ptr<Packet> packet);
-
-  /**
-   * Checking if we are performing the transmission of a new packet or a retransmission, and call SendToPhy function.
-   *
-   * \param packet the packet to send
-   */
-  virtual void DoSend (Ptr<Packet> packet);
-
-  /**
-  * Add headers and send a packet with the sending function of the physical layer.
-  *
-  * \param packet the packet to send
-  */
-  virtual void SendToPhy (Ptr<Packet> packet);
-
-  /**
-   * Postpone transmission to the specified time and delete previously scheduled transmissions if present.
-   *
-   * \param nextTxDelay Delay at which the transmission will be performed.
-   */
-  virtual void postponeTransmission (Time nextTxDelay, Ptr<Packet>);
-
-
-  ///////////////////////
-  // Receiving methods //
-  ///////////////////////
-
-  /**
-   * Receive a packet.
-   *
-   * This method is typically registered as a callback in the underlying PHY
-   * layer so that it's called when a packet is going up the stack.
-   *
-   * \param packet the received packet.
-   */
-  virtual void Receive (Ptr<Packet const> packet);
-
-  virtual void FailedReception (Ptr<Packet const> packet);
-
-  /**
-   * Perform the actions that are required after a packet send.
-   *
-   * This function handles opening of the first receive window.
-   */
-  void TxFinished (Ptr<const Packet> packet);
-
-  /**
-   * Perform operations needed to open the first receive window.
-   */
-  void OpenFirstReceiveWindow (void);
-
-  /**
-   * Perform operations needed to open the second receive window.
-   */
-  void OpenSecondReceiveWindow (void);
-
-  /**
-   * Perform operations needed to close the first receive window.
-   */
-  void CloseFirstReceiveWindow (void);
-
-  /**
-   * Perform operations needed to close the second receive window.
-   */
-  void CloseSecondReceiveWindow (void);
-
-  /////////////////////////
-  // Getters and Setters //
-  /////////////////////////
-
-  /**
-  * Reset retransmission parameters contained in the structure LoraRetxParams
-  */
-  virtual void resetRetransmissionParameters ();
-
-  /**
-   * Enable data rate adaptation in the retransmitting procedure.
-   *
-   * \param adapt If the data rate adaptation is enabled or not.
-   */
-  void SetDataRateAdaptation (bool adapt);
-
-  /**
-   * Get if data rate adaptation is enabled or not.
-   */
-  bool GetDataRateAdaptation (void);
-
-  /**
-   * Set the maximum number of transmissions allowed.
-   *
-   * \param maxNumbTx The maximum number of transmissions allowed
-   */
-  void SetMaxNumberOfTransmissions (uint8_t maxNumbTx);
-
-  /**
-   * Set the maximum number of transmissions allowed.
-   */
-  uint8_t GetMaxNumberOfTransmissions (void);
-
-  /**
-   * Set the data rate this end device will use when transmitting. For End
-   * Devices, this value is assumed to be fixed, and can be modified via MAC
-   * commands issued by the GW.
-   *
-   * \param dataRate The dataRate to use when transmitting.
-   */
-  void SetDataRate (uint8_t dataRate);
-
-  /**
-   * Get the data rate this end device is set to use.
-   *
-   * \return The data rate this device uses when transmitting.
-   */
-  uint8_t GetDataRate (void);
-
-  /**
-   * Set the network address of this device.
-   *
-   * \param address The address to set.
-   */
-  void SetDeviceAddress (LoraDeviceAddress address);
-
-  /**
-   * Get the network address of this device.
-   *
-   * \return This device's address.
-   */
-  LoraDeviceAddress GetDeviceAddress (void);
-
-  /**
-   * Set the Data Rate to be used in the second receive window.
-   *
-   * \param dataRate The Data Rate.
-   */
-  void SetSecondReceiveWindowDataRate (uint8_t dataRate);
-
-  /**
-   * Get the Data Rate that will be used in the first receive window.
-   *
-   * \return The Data Rate
-   */
-  uint8_t GetFirstReceiveWindowDataRate (void);
-
-  /**
-   * Get the Data Rate that will be used in the second receive window.
-   *
-   * \return The Data Rate
-   */
-  uint8_t GetSecondReceiveWindowDataRate (void);
-
-  /**
-   * Set the frequency that will be used for the second receive window.
-   *
-   * \param frequencyMHz the Frequency.
-   */
-  void SetSecondReceiveWindowFrequency (double frequencyMHz);
-
-  /**
-   * Get the frequency that is used for the second receive window.
-   *
-   * @return The frequency, in MHz
-   */
-  double GetSecondReceiveWindowFrequency (void);
-
-  /**
-   * Set a value for the RX1DROffset parameter.
-   *
-   * This value decides the offset to use when deciding the DataRate of the
-   * downlink transmission during the first receive window from the
-   * replyDataRateMatrix.
-   *
-   * \param rx1DrOffset The value to set for the offset.
-   */
-  // void SetRx1DrOffset (uint8_t rx1DrOffset);
-
-  /**
-   * Get the value of the RX1DROffset parameter.
-   *
-   * \return The value of the RX1DROffset parameter.
-   */
-  // uint8_t GetRx1DrOffset (void);
-
-  /**
-   * Get the aggregated duty cycle.
-   *
-   * \return A time instance containing the aggregated duty cycle in fractional
-   * form.
-   */
-  double GetAggregatedDutyCycle (void);
-
-  /////////////////////////
-  // MAC command methods //
-  /////////////////////////
-
-  /**
-   * Add the necessary options and MAC commands to the LoraFrameHeader.
-   *
-   * \param frameHeader The frame header on which to apply the options.
-   */
-  void ApplyNecessaryOptions (LoraFrameHeader &frameHeader);
-
-  /**
-   * Add the necessary options and MAC commands to the LoraMacHeader.
-   *
-   * \param macHeader The mac header on which to apply the options.
-   */
-  void ApplyNecessaryOptions (LoraMacHeader &macHeader);
-
-  /**
-   * Set the message type to send when the Send method is called.
-   */
-  void SetMType (LoraMacHeader::MType mType);
-
-  /**
- * Get the message type to send when the Send method is called.
+ * Set the data rate this end device will use when transmitting. For End
+ * Devices, this value is assumed to be fixed, and can be modified via MAC
+ * commands issued by the GW.
+ *
+ * \param dataRate The dataRate to use when transmitting.
  */
-  LoraMacHeader::MType GetMType (void);
+    void SetDataRate (uint8_t dataRate);
 
-  /**
-   * Parse and take action on the commands contained on this FrameHeader.
-   */
-  void ParseCommands (LoraFrameHeader frameHeader);
+    /**
+     * Get the data rate this end device is set to use.
+     *
+     * \return The data rate this device uses when transmitting.
+     */
+    uint8_t GetDataRate (void);
 
-  /**
-   * Perform the actions that need to be taken when receiving a LinkCheckAns command.
-   *
-   * \param margin The margin value of the command.
-   * \param gwCnt The gateway count value of the command.
-   */
-  void OnLinkCheckAns (uint8_t margin, uint8_t gwCnt);
+    /**
+     * Set the network address of this device.
+     *
+     * \param address The address to set.
+     */
+    void SetDeviceAddress (LoraDeviceAddress address);
 
-  /**
-   * Perform the actions that need to be taken when receiving a LinkAdrReq command.
-   *
-   * \param dataRate The data rate value of the command.
-   * \param txPower The transmission power value of the command.
-   * \param enabledChannels A list of the enabled channels.
-   * \param repetitions The number of repetitions prescribed by the command.
-   */
-  void OnLinkAdrReq (uint8_t dataRate, uint8_t txPower,
-                     std::list<int> enabledChannels, int repetitions);
+    /**
+     * Get the network address of this device.
+     *
+     * \return This device's address.
+     */
+    LoraDeviceAddress GetDeviceAddress (void);
 
-  /**
-   * Perform the actions that need to be taken when receiving a DutyCycleReq command.
-   *
-   * \param dutyCycle The aggregate duty cycle prescribed by the command, in
-   * fraction form.
-   */
+    /**
+     * Set the Data Rate to be used in the second receive window.
+     *
+     * \param dataRate The Data Rate.
+     */
+    void SetSecondReceiveWindowDataRate (uint8_t dataRate);
+
+    /**
+     * Get the Data Rate that will be used in the first receive window.
+     *
+     * \return The Data Rate
+     */
+    uint8_t GetFirstReceiveWindowDataRate (void);
+
+    /**
+     * Get the Data Rate that will be used in the second receive window.
+     *
+     * \return The Data Rate
+     */
+    uint8_t GetSecondReceiveWindowDataRate (void);
+
+    /**
+     * Set the frequency that will be used for the second receive window.
+     *
+     * \param frequencyMHz the Frequency.
+     */
+    void SetSecondReceiveWindowFrequency (double frequencyMHz);
+
+    /**
+     * Get the frequency that is used for the second receive window.
+     *
+     * @return The frequency, in MHz
+     */
+    double GetSecondReceiveWindowFrequency (void);
+
+    /**
+     * Set a value for the RX1DROffset parameter.
+     *
+     * This value decides the offset to use when deciding the DataRate of the
+     * downlink transmission during the first receive window from the
+     * replyDataRateMatrix.
+     *
+     * \param rx1DrOffset The value to set for the offset.
+     */
+    // void SetRx1DrOffset (uint8_t rx1DrOffset);
+
+    /**
+     * Get the value of the RX1DROffset parameter.
+     *
+     * \return The value of the RX1DROffset parameter.
+     */
+    // uint8_t GetRx1DrOffset (void);
+
+    /**
+     * Get the aggregated duty cycle.
+     *
+     * \return A time instance containing the aggregated duty cycle in fractional
+     * form.
+     */
+    double GetAggregatedDutyCycle (void);
+
+    /////////////////////////
+    // MAC command methods //
+    /////////////////////////
+
+    /**
+     * Add the necessary options and MAC commands to the LoraFrameHeader.
+     *
+     * \param frameHeader The frame header on which to apply the options.
+     */
+    void ApplyNecessaryOptions (LoraFrameHeader &frameHeader);
+
+    /**
+     * Add the necessary options and MAC commands to the LoraMacHeader.
+     *
+     * \param macHeader The mac header on which to apply the options.
+     */
+    void ApplyNecessaryOptions (LoraMacHeader &macHeader);
+
+    /**
+     * Set the message type to send when the Send method is called.
+     */
+    void SetMType (LoraMacHeader::MType mType);
+
+    /**
+     * Get the message type to send when the Send method is called.
+     */
+    LoraMacHeader::MType GetMType (void);
+
+    /**
+     * Parse and take action on the commands contained on this FrameHeader.
+     */
+    void ParseCommands (LoraFrameHeader frameHeader);
+
+    /**
+     * Perform the actions that need to be taken when receiving a LinkCheckAns command.
+     *
+     * \param margin The margin value of the command.
+     * \param gwCnt The gateway count value of the command.
+     */
+    void OnLinkCheckAns (uint8_t margin, uint8_t gwCnt);
+
+    /**
+     * Perform the actions that need to be taken when receiving a LinkAdrReq command.
+     *
+     * \param dataRate The data rate value of the command.
+     * \param txPower The transmission power value of the command.
+     * \param enabledChannels A list of the enabled channels.
+     * \param repetitions The number of repetitions prescribed by the command.
+     */
+    void OnLinkAdrReq (uint8_t dataRate, uint8_t txPower,
+                       std::list<int> enabledChannels, int repetitions);
+
+    /**
+     * Perform the actions that need to be taken when receiving a DutyCycleReq command.
+     *
+     * \param dutyCycle The aggregate duty cycle prescribed by the command, in
+     * fraction form.
+     */
   void OnDutyCycleReq (double dutyCycle);
 
   /**
@@ -373,11 +373,11 @@ public:
   uint8_t GetTransmissionPower (void);
 
 private:
-  /**
-   * Structure representing the parameters that will be used in the
-   * retransmission procedure.
-   */
-  struct LoraRetxParameters
+     /**
+      * Structure representing the parameters that will be used in the
+      * retransmission procedure.
+      */
+     struct LoraRetxParameters
      {
     Time firstAttempt;
     Ptr<Packet> packet = 0;
