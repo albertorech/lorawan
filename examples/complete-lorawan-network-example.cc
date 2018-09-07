@@ -37,8 +37,8 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("ComplexLorawanNetworkExample");
 
 // Network settings
-int nDevices = 200;
-int gatewayRings = 3;
+int nDevices = 2000;
+int gatewayRings = 4;
 int nGateways = 3 * gatewayRings * gatewayRings - 3 * gatewayRings + 1; //numero di gateway disposti esagonalmente a anelli
 double radius = 15000; //raggio dell'area se aumento posso avere undersensitivity
 double simulationTime = 600;
@@ -47,7 +47,7 @@ std::vector<int> sfQuantity (6);
 
 // Output control
 bool printEDs = true;
-bool buildingsEnabled = false;
+bool buildingsEnabled = true;
 
 void
 PrintEndDevices (NodeContainer endDevices, NodeContainer gateways, std::string edFilename, std::string gwFilename)
